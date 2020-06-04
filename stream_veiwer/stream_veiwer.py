@@ -14,7 +14,8 @@ while True:
         img = base64.b64decode(frame)
         npimg = np.fromstring(img, dtype=np.uint8)
         source = cv2.imdecode(npimg, 1)
-        cv2.imshow("Stream", source)
+        vi = cv2.resize(source, (640, 480))
+        cv2.imshow("Stream", vi)
         cv2.waitKey(1)
 
     except KeyboardInterrupt:

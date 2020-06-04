@@ -24,7 +24,7 @@ def binarize(img, d=0):
     binaryh = cv.inRange(hls, (0, 0, 0), (255, 255, 100))
 
     gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-    binaryg = cv.inRange(gray, 0, 100)
+    binaryg = cv.inRange(gray, 0, 50)
 
     binary = cv.bitwise_and(binaryg, binaryh)
 
@@ -48,9 +48,9 @@ def constrain(val, minv, maxv):
 
 
 integral = 0
-KP = 0.2
-KI = 0
-KD = 0
+KP = 0.17
+KI = 0.1
+KD = 0.4
 last = 0
 def find_left_right(perspective, d=0):
     global integral, last, KP, KI, KD
@@ -73,6 +73,36 @@ def find_left_right(perspective, d=0):
     return 90 + pid
 
 
+def find_left_right_canny(edges, d=0):
+    global integral, last, KP, KI, KD
+
+    first = edges[-1]
+    # print(first.shape)
+
+    left = 200
+    for i, e in enumerate(first):
+        if e > 0:
+            left = i
+            break
+
+    right = 200
+    for i, e in enumerate(first[::-1]):
+        if e > 0:
+            right = first.shape[0] - i
+            break
+
+    sred = (left + right) // 2
+    cv.line(edges, (right, 0), (right, 300), 50, 10)
+    # stream(edges)
+    err = -1 * (right - first.shape[0] // 2)
+
+    pid = KP * err + KD * (err - last) + KI * integral
+    last = err
+    integral += err
+    integral = constrain(integral, -10, 10)
+
+    return 90 + pid
+
 def command(s ,angle, dir, speed):
     comm = "SPD {},{},{} ".format(constrain(int(angle), 65, 125), dir, speed)
     print(comm)
@@ -87,10 +117,10 @@ RECT = np.float32([[0, 299],
                    [399, 0],
                    [0, 0]])
 
-TRAP = np.float32([[80, 299],
-                   [270, 299],
-                   [235, 250],
-                   [115, 250]])
+TRAP = np.float32([[100, 299],
+                   [310, 299],
+                   [275, 250],
+                   [135, 250]])
 TRAPINT = np.array(TRAP, dtype=np.int32)
 
 cap = cv2.VideoCapture(0)
@@ -98,8 +128,8 @@ ch_povor = 1
 
 povors = [False] * 40
 
-s = serial.Serial('/dev/ttyS3', 115200, timeout=1)
-# s = None
+# s = serial.Serial('/dev/ttyS3', 115200, timeout=1)
+s = None
 
 while True:
     ret, frame = cap.read()
@@ -114,40 +144,12 @@ while True:
     perspective = trans_perspective(binary, TRAP, RECT, SIZE)
     edges = cv2.Canny(perspective, 100, 200)
 
-    and_line = np.array([0] * 400)
-    for line in perspective[:10]:
-        and_line = np.bitwise_or(and_line, line)
-
-    last = 0
-    kol = 0
-    for e in and_line:
-        if e > 0 and last == 0:
-            kol += 1
-        last = e
-
-    if kol > 1:
-        # print('povor', ch_povor)
-        povors.append(True)
-        povors.pop(0)
-        ch_povor += 1
-    else:
-        povors.append(False)
-        povors.pop(0)
-
-    if povors.count(True) > 15:
-        print('povors', ch_povor)
-        start_t = time()
-        while time() - start_t < 3:
-            command(s, 65, 1, 10)
-            sleep(0.05)
-        break
-
-    grad = (find_left_right(perspective, 0))
-    command(s, grad, 1, 10)
+    grad = (find_left_right_canny(edges, 0))
+    command(s, grad, 1, 20)
 
     #cv2.imshow('pers', perspective)
     #cv2.imshow('im', img)
-    stream(edges)
+    stream(img)
 
     sleep(0.05)
     q = cv2.waitKey(10)
