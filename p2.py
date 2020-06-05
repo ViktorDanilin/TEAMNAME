@@ -48,9 +48,9 @@ def constrain(val, minv, maxv):
 
 
 integral = 0
-KP = 0.17
-KI = 0.1
-KD = 0.4
+KP = 0.19
+KI = 0
+KD = 0.32
 last = 0
 def find_left_right(perspective, d=0):
     global integral, last, KP, KI, KD
@@ -76,7 +76,7 @@ def find_left_right(perspective, d=0):
 def find_left_right_canny(edges, d=0):
     global integral, last, KP, KI, KD
 
-    first = edges[-1]
+    first = edges[-100]
     # print(first.shape)
 
     left = 200
@@ -93,8 +93,9 @@ def find_left_right_canny(edges, d=0):
 
     sred = (left + right) // 2
     cv.line(edges, (right, 0), (right, 300), 50, 10)
-    # stream(edges)
-    err = -1 * (right - first.shape[0] // 2)
+    cv.line(edges, (left, 0), (left, 300), 50, 10)
+    stream(edges)
+    err = -1 * (left - first.shape[0] // 2)
 
     pid = KP * err + KD * (err - last) + KI * integral
     last = err
@@ -128,8 +129,11 @@ ch_povor = 1
 
 povors = [False] * 40
 
-# s = serial.Serial('/dev/ttyS3', 115200, timeout=1)
-s = None
+s = serial.Serial('/dev/ttyS3', 115200, timeout=1)
+# s = None
+
+command(s, 90, 1, 0)
+sleep(1)
 
 while True:
     ret, frame = cap.read()
@@ -145,11 +149,11 @@ while True:
     edges = cv2.Canny(perspective, 100, 200)
 
     grad = (find_left_right_canny(edges, 0))
-    command(s, grad, 1, 20)
+    command(s, grad, 1, 15)
 
     #cv2.imshow('pers', perspective)
     #cv2.imshow('im', img)
-    stream(img)
+    # stream(img)
 
     sleep(0.05)
     q = cv2.waitKey(10)
