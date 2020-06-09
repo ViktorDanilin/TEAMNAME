@@ -2,64 +2,15 @@ import cv2
 import cv2 as cv
 import numpy as np
 from time import sleep, time
-import serial
-import sys
-
-import base64
-import zmq
-
+from serial import Serial
 from simple_pid import PID
-pid = PID(0.2, 0, 0.1, setpoint=150)
-pid_right = PID(0.23, 0, 0.2, setpoint=250)
 
-context = zmq.Context()
-footage_socket = context.socket(zmq.PUB)
-footage_socket.connect('tcp://46.161.156.148:5555')
+from stream.send import Streamer
+from helpers import *
+from control import Motors
 
 
-def stream(frame):
-    frame1 = cv2.resize(frame, (200, 150))  # resize the frame
-    encoded, buffer = cv2.imencode('.jpg', frame1)
-    jpg_as_text = base64.b64encode(buffer)
-    footage_socket.send(jpg_as_text)
-
-
-def binarize(img, d=0):
-    hls = cv.cvtColor(img, cv.COLOR_BGR2HLS)
-    binaryh = cv.inRange(hls, (0, 0, 0), (255, 255, 255))
-
-    gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-    binaryg = cv.inRange(gray, 0, 40)
-
-    binary = cv.bitwise_and(binaryg, binaryh)
-
-    if d:
-        cv.imshow('hls', binaryh)
-        cv.imshow('gray', binaryg)
-        cv.imshow('bin', binary)
-    return binary
-
-
-def trans_perspective(binary, trap, rect, size, d=0):
-    M = cv.getPerspectiveTransform(trap, rect)
-    perspective = cv.warpPerspective(binary, M, size, flags=cv.INTER_LINEAR)
-    if d:
-        cv.imshow('perspective', perspective)
-    return perspective
-
-
-def constrain(val, minv, maxv):
-    return min(maxv, max(minv, val))
-
-
-integral = 0
-KP = 0.2
-KI = 0
-KD = 0.3
-last = 0
 def find_left_right(perspective, d=0):
-    global integral, last, KP, KI, KD
-
     if False and timeout_detect_stop > 0 and int(time()) < timeout_detect_stop + 5:
         print('canny')
         return find_left_right_canny(perspective)
@@ -69,17 +20,9 @@ def find_left_right(perspective, d=0):
 
         if d:
             cv.line(perspective, (left, 0), (left, 300), 50, 2)
-
             cv.imshow('lines', perspective)
 
         control = pid(left)
-
-        # err = -1 * (left - perspective.shape[1] // 2)
-        #
-        # pid = KP * err + KD * (err - last) + KI * integral
-        # last = err
-        # integral += err
-        # integral = constrain(integral, -10, 10)
 
         return 90 + control
 
@@ -117,36 +60,32 @@ def find_left_right_canny(edges, d=0):
 
     return 90 + control
 
-def command(s ,angle, dir, speed):
-    comm = "SPD {},{},{},{} ".format(constrain(int(angle), 65, 125), dir, speed, 0)
-    # print(comm)
-    if s is not None:
-        s.write(comm.encode())
 
-# TODO: to one func
-def check_cnt(c):
-    peri = cv2.arcLength(c, True)
-    approx = cv2.approxPolyDP(c, 0.1 * peri, True)
-    if len(approx) == 4:
-        (x, y, w, h) = cv2.boundingRect(approx)
-        ar = w / float(h)
-        print(ar)
-        if 0.4 < ar < 0.7:
-            return True
-    return False
+# # TODO: to one func
+# def check_cnt(c):
+#     peri = cv2.arcLength(c, True)
+#     approx = cv2.approxPolyDP(c, 0.1 * peri, True)
+#     if len(approx) == 4:
+#         (x, y, w, h) = cv2.boundingRect(approx)
+#         ar = w / float(h)
+#         print(ar)
+#         if 0.4 < ar < 0.7:
+#             return True
+#     return False
 
 
-def findBigContour(mask):
+def findBigContour(mask, s_min=1000, s_max=10000):
     contours = cv.findContours(mask, cv.RETR_TREE, cv.CHAIN_APPROX_NONE)[0]
     if contours:
-        contours = sorted(contours, key=cv.contourArea, reverse=True)
-        for c in contours:
-            if 1000 < cv.contourArea(c) < 40000:
-                if check_cnt(c):
-                    # print(c)
-                    return c
-    else:
-        return None
+        for c in sorted(contours, key=cv.contourArea, reverse=True):
+            if s_min < cv.contourArea(c) < s_max:
+                P = cv2.arcLength(c, True)
+                approx = cv2.approxPolyDP(c, 0.1 * P, True)
+                if len(approx) == 4:
+                    x, y, w, h = cv2.boundingRect(approx)
+                    ar = w / float(h)
+                    if 0.4 < ar < 0.7:
+                        return c
 
 
 timeout_detect_stop = -100
@@ -169,6 +108,8 @@ def detect_stop(perspective):
 
 last_tl = ''
 tl_allowed = True
+
+
 def standardize_input(image):
     global last_tl, tl_allowed
     frame = cv2.resize(image, (44, 81))
@@ -194,7 +135,7 @@ def standardize_input(image):
         last_tl = 'off'
         tl_allowed = True
     else:
-        if green_s > red_s-5000 and green_s > yellow_s-5000:
+        if green_s > red_s - 5000 and green_s > yellow_s - 5000:
             if last_tl == 'off':
                 print('blink')
                 tl_allowed = True
@@ -203,9 +144,9 @@ def standardize_input(image):
                 last_tl = 'green'
                 tl_allowed = True
         elif red_s > green_s or yellow_s > green_s:
-            if red_s > yellow_s+10000:
+            if red_s > yellow_s + 10000:
                 print('red')
-            elif yellow_s > red_s+10000:
+            elif yellow_s > red_s + 10000:
                 print('yellow')
             elif yellow_red_s > 10000:
                 print('yellow and red')
@@ -216,7 +157,7 @@ def standardize_input(image):
     return standard_im
 
 
-# constants
+### Constants
 SIZE = (400, 300)
 
 RECT = np.float32([[0, 299],
@@ -228,31 +169,46 @@ TRAP = np.float32([[100, 299],
                    [300, 299],
                    [275, 240],
                    [125, 240]])
-TRAPINT = np.array(TRAP, dtype=np.int32)
+# TRAPINT = np.array(TRAP, dtype=np.int32)
 
+SPEED = 15
+
+
+### PIDs
+pid = PID(0.2, 0, 0.1, setpoint=150)
+pid_right = PID(0.23, 0, 0.2, setpoint=250)
+
+
+### Communications
+s = Streamer('46.161.156.148', 5555)
+
+m = Motors(Serial('/dev/ttyS3', 115200, timeout=1))
+# m = Motors(None)
+
+
+### OpenCV Objects
 cap = cv2.VideoCapture(0)
+out = cv2.VideoWriter('outpy.avi', cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 10, SIZE)
+
+
+### Other
+povors = [False] * 40
 ch_povor = 1
 
-out = cv2.VideoWriter('outpy.avi',cv2.VideoWriter_fourcc('M','J','P','G'), 10, SIZE)
-
-
-povors = [False] * 40
-
-s = serial.Serial('/dev/ttyS3', 115200, timeout=1)
-# s = None
-
-command(s, 90, 1, 0)
+m.stop()
 sleep(1)
 krasniy = False
 # timeout_detect_stop = int(time())
+
+
 while True:
     ret, frame = cap.read()
 
     img = cv2.resize(frame, SIZE)
-    binary = binarize(img)
+    binary = binarize(img, gray_start=0, gray_end=40)
 
-    tl = img[img.shape[0]//3:int(img.shape[0]/1.3),img.shape[1]//2:]
-    binary_tl = binarize(tl)
+    tl = img[img.shape[0] // 3:int(img.shape[0] / 1.3), img.shape[1] // 2:]
+    binary_tl = binarize(tl, gray_start=0, gray_end=40)
 
     for e in TRAP:
         for i in TRAP:
@@ -262,7 +218,6 @@ while True:
     edges = cv2.Canny(perspective, 100, 200)
 
     grad = (find_left_right(edges, 0))
-
 
     # if detect_stop(perspective):
     #     print('stop')
@@ -276,33 +231,28 @@ while True:
 
         # if cnt is not None:
         # cv.drawContours(tl, cnt, -1, (255, 0, 0), 10)
-        stream(tl[y:y+h, x:x+w])
-        standardize_input(tl[y:y+h, x:x+w])
+        s.stream('tl', tl[y:y + h, x:x + w])
+        standardize_input(tl[y:y + h, x:x + w])
         # command(s, 90, 1, 0)
-    else:
-        #cv2.imshow('pers', perspective)
-        #cv2.imshow('im', img)
-        stream(img)
+
 
     if detect_stop(perspective):
         if cnt is not None:
             if not tl_allowed:
                 print('stop')
-                command(s, grad, 1, 0)
+                m.stop()
                 krasniy = True
 
     if krasniy:
         print('krs')
-        command(s, grad, 1, 0)
+        m.stop()
         if tl_allowed:
             krasniy = False
     else:
-        command(s, grad, 1, 15)
+        m.command(grad, 1, SPEED)
 
-
-    # stream(img)
+    s.stream('main', img)
     q = cv2.waitKey(10)
     if q == ord('q'):
         break
 
-s.close()
