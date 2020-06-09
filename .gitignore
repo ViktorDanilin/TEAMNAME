@@ -1,4 +1,7 @@
 *.mp4
+*.avi
+*.png
+*.jpg
 *.log
 
 ### JetBrains ###
