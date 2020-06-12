@@ -5,11 +5,17 @@ import time
 video = 'videos/outpy1.avi'
 cap = cv.VideoCapture(video)
 
-sezd = cv.imread("images/sezd.png")
-parking = cv.imread("images/parking.png")
-forvard = cv.imread("images/forvard.png")
-right = cv.imread("images/right.png")
-left = cv.imread("images/left.png")
+<<<<<<< HEAD
+sezd = cv.imread("validation/obezd.png")
+parking = cv.imread("validation/parking.jpg")
+forvard = cv.imread("validation/left.jpg")
+=======
+sezd = cv.imread("validation/sezd.png")
+parking = cv.imread("validation/parking.jpg")
+forvard = cv.imread("validation/forvard.png")
+>>>>>>> origin/master
+right = cv.imread("validation/right.jpg")
+left = cv.imread("validation/left.jpg")
 sezd = cv.resize(sezd, (64, 64))
 forvard = cv.resize(forvard, (64, 64))
 right = cv.resize(right, (64, 64))

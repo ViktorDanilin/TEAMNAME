@@ -3,6 +3,9 @@
 *.png
 *.jpg
 *.log
+logs
+*.h5
+*.pkl
 
 ### JetBrains ###
 .idea/

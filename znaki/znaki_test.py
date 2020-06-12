@@ -5,11 +5,11 @@ import os
 
 #cap = cv.VideoCapture(0)
 
-sezd = cv.imread("images/sezd.png")
-parking = cv.imread("images/parking.png")
-forvard = cv.imread("images/forvard.png")
-right = cv.imread("images/right.png")
-left = cv.imread("images/left.png")
+sezd = cv.imread("validation/sezd.png")
+parking = cv.imread("validation/parking.jpg")
+forvard = cv.imread("validation/forvard.png")
+right = cv.imread("validation/right.jpg")
+left = cv.imread("validation/left.jpg")
 sezd = cv.resize(sezd, (64, 64))
 forvard = cv.resize(forvard, (64, 64))
 right = cv.resize(right, (64, 64))
