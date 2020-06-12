@@ -26,7 +26,7 @@ class Viewer:
 
 
 def f(window, frame):
-    vi = cv2.resize(frame, (640, 480))
+    vi = cv2.resize(frame, (400, 300))
     cv2.imshow(window, vi)
     cv2.waitKey(1)
 
