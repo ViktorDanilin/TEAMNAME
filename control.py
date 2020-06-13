@@ -22,6 +22,9 @@ class Motors:
         self.command(90, 1, 0)
 
     def read(self, frame_id='start'):
-        s = self.interface.readline().replace(b'\n', b'').decode()
-        if s[0] == 'F' and s[-1] == 'E':
-            return float(s[1:-1]) - self.frame_ids[frame_id]
+        if self.interface is not None:
+            s = self.interface.readline().replace(b'\n', b'').decode()
+            if s[0] == 'F' and s[-1] == 'E':
+                return float(s[1:-1]) - self.frame_ids[frame_id]
+        else:
+            return 0

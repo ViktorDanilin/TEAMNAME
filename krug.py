@@ -224,7 +224,7 @@ SPEED = 20
 
 
 ### PIDs
-pid = PID(0.2, 0, 0.1, setpoint=150)
+pid = PID(0.2, 0, 0.1, setpoint=200)
 pid_right = PID(0.4, 0, 0.1, setpoint=250)
 pid_left = PID(0.23, 0, 0.1, setpoint=150)
 
@@ -238,7 +238,7 @@ m = Motors(Serial('/dev/ttyS3', 115200, timeout=1))
 
 ### OpenCV Objects
 cap = cv2.VideoCapture(0)
-out = cv2.VideoWriter('outpy.avi', cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 10, SIZE)
+# out = cv2.VideoWriter('outpy.avi', cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 10, SIZE)
 
 
 ### Other
@@ -294,22 +294,11 @@ while True:
         # command(s, 90, 1, 0)
 
     if detect_stop(perspective):
-        if not tl_allowed and time() - tl_allowed_timer < 2:
-            print('STOP!!!!!!!!!!!!!!!!!!')
-            m.stop()
-            krasniy = True
-            kras_time = int(time())
+        pass
 
-    if krasniy or int(time()) - kras_time < 1:
-        print('krs')
-        m.stop()
-        timeout_detect_stop = time()
-        if tl_allowed:
-            krasniy = False
-    else:
-        m.command(grad, 1, SPEED)
+    m.command(grad, 1, SPEED)
 
-    print(m.read())
+    # print(m.read())
 
     s.stream('main', img)
     s.stream('s', signs)
